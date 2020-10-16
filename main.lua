@@ -17,9 +17,9 @@ local function inverttr(m)
     m[1][3], m[3][1] = m[3][1], m[1][3]
     m[3][2], m[2][3] = m[2][3], m[3][2]
     local t = m * matrix{{m[1][4]},{m[2][4]},{m[3][4]},{0}}
-    m[1][4] = t[1][1]
-    m[2][4] = t[2][1]
-    m[3][4] = t[3][1]
+    m[1][4] = -t[1][1]
+    m[2][4] = -t[2][1]
+    m[3][4] = -t[3][1]
     return m
 end
 local function fastmulvec(m, v, out)
