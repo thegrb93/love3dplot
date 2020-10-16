@@ -108,6 +108,8 @@ function plot:initialize(minx, maxx, nx, miny, maxy, ny)
     self.ylinestf = ylinestf
 
     self.camera = camera:new(90, scrw, scrh, 0.1, 10000)
+    self.font = love.graphics.newFont()
+    self.paramtext = love.graphics.newText(self.font)
     self.t = 0
     self.dt = 1/60
     hook.add("render",self)
@@ -136,7 +138,7 @@ function plot:drawGraph()
     end
     local zdiff = maxz - minz
 
-    local zscale = 0.00001
+    -- local zscale = 0.00001
     local zmax = math.max(math.abs(minz), math.abs(maxz))
     -- if zmax > 100 then
         -- zscale = 100 / zmax
@@ -144,7 +146,7 @@ function plot:drawGraph()
 
     for k, v in ipairs(self.points) do
         local c = math.abs(v[3])/zmax
-        v[3] = v[3] * zscale
+        -- v[3] = v[3] * zscale
         local pt = self.pointstf[k]
         self.camera:transform(v, pt)
         love.graphics.setColor(lerp(c, colormin[1], colormax[1]), lerp(c, colormin[2], colormax[2]), lerp(c, colormin[3], colormax[3]))
@@ -158,7 +160,7 @@ function plot:render()
     local r = 130
     self.camera:lookAt(matrix{50+r*math.cos(theta), 50+r*math.sin(theta), 40}, matrix{50, 50, 0}, matrix{0, 0, 1})
 
-    self.funcparam = math.sin(self.t)*5+3
+    self.funcparam = math.sin(self.t)*1.4+1.5
 
     love.graphics.setLineWidth(linew)
     love.graphics.setColor(0.6, 0.6, 0.6, 0.6)
@@ -166,14 +168,24 @@ function plot:render()
     self:drawGrid(self.ylines, self.ylinestf)
     love.graphics.setLineWidth(pointw)
     self:drawGraph()
+
+    self.paramtext:set("Param = " .. tostring(self.funcparam))
+    love.graphics.draw(self.paramtext, 5, 5)
 end
 
 hook.add("postload","main",function()
     local p = plot:new(0, 100, 50, 0, 100, 50)
+
+    -- function p:func(x, y)
+        -- local param = self.funcparam
+        -- return ((x+y)^3 - x^3 - y^3 - x^2*y*param - x*y^2*param) * 0.00001
+    -- end
+
     function p:func(x, y)
         local param = self.funcparam
-        return (x+y)^3 - x^3 - y^3 - x^2*y*param - x*y^2*param
+        return ((x+y)^3 - x^3 - y^3 - 3*x^(3-param)*y^param - 3*x^param*y^(3-param)) * 0.00001
     end
+
 end)
 
 function love.run()
