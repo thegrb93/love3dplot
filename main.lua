@@ -158,6 +158,8 @@ function plot:render()
     local r = 130
     self.camera:lookAt(matrix{50+r*math.cos(theta), 50+r*math.sin(theta), 40}, matrix{50, 50, 0}, matrix{0, 0, 1})
 
+    self.funcparam = math.sin(self.t)*5+3
+
     love.graphics.setLineWidth(linew)
     love.graphics.setColor(0.6, 0.6, 0.6, 0.6)
     self:drawGrid(self.xlines, self.xlinestf)
@@ -169,8 +171,8 @@ end
 hook.add("postload","main",function()
     local p = plot:new(0, 100, 50, 0, 100, 50)
     function p:func(x, y)
-        local s = math.sin(self.t)*5+3
-        return (x+y)^3 - x^3 - y^3 - x^2*y*s - x*y^2*s
+        local param = self.funcparam
+        return (x+y)^3 - x^3 - y^3 - x^2*y*param - x*y^2*param
     end
 end)
 
