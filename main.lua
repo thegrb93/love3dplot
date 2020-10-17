@@ -123,8 +123,14 @@ end
 local colormin = {1, 1, 1}
 local colormax = {0.6745, 0.2039, 0.1412}
 function plot:drawGraph()
+    local minz, maxz = math.huge, -math.huge
     for k, v in ipairs(self.points) do
-        local c = math.abs(v[3])/self.zmax
+        minz = math.min(minz, v[3])
+        maxz = math.max(maxz, v[3])
+    end
+    for k, v in ipairs(self.points) do
+        local c
+        if v[3]<0 then c = v[3]/minz else c = v[3]/maxz end
         local pt = self.pointstf[k]
         self.camera:transform(v, pt)
         love.graphics.setColor(lerp(c, colormin[1], colormax[1]), lerp(c, colormin[2], colormax[2]), lerp(c, colormin[3], colormax[3]))
@@ -215,7 +221,7 @@ function minimizer:calcPermutations()
 end
 function minimizer:step()
     --Find error that is less than current
-    -- for _=1, 30 do
+    for _=1, 5 do
         local leasterr = self.lasterror
         local leastperm
         local original = {}
@@ -238,11 +244,11 @@ function minimizer:step()
             self.stepsize = self.stepsize * 0.5
             self:calcPermutations()
         end
-    -- end
+    end
 end
 
 hook.add("postload","main",function()
-    local p = plot:new(0, 100, 30, 0, 100, 30)
+    local p = plot:new(0, 100, 50, 0, 100, 50)
     local points = p.points
     local params = {1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5}
 
@@ -265,15 +271,9 @@ hook.add("postload","main",function()
         return z*0.2
     end
     local function calcPoints()
-        local minz, maxz = math.huge, -math.huge
         for k, v in ipairs(points) do
-            local z = func(v[1], v[2])
-            minz = math.min(minz, z)
-            maxz = math.max(maxz, z)
-            v[3] = z
+            v[3] = func(v[1], v[2])
         end
-        local zmax = math.max(math.abs(minz), math.abs(maxz))
-        p.zmax = zmax
     end
 
     local minimi = minimizer:new(points, params, 0.1, calcPoints)
