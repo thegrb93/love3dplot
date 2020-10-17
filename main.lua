@@ -108,14 +108,8 @@ function plot:initialize(minx, maxx, nx, miny, maxy, ny)
     self.ylinestf = ylinestf
 
     self.camera = camera:new(90, scrw, scrh, 0.1, 10000)
-    self.font = love.graphics.newFont()
-    self.paramtext = love.graphics.newText(self.font)
     self.t = 0
     self.dt = 1/60
-    hook.add("render",self)
-end
-function plot:destroy()
-    hook.remove("render",self)
 end
 function plot:drawGrid(points, pointstf)
     for i=1, #points, 2 do
@@ -129,24 +123,8 @@ end
 local colormin = {1, 1, 1}
 local colormax = {0.6745, 0.2039, 0.1412}
 function plot:drawGraph()
-    local minz, maxz = math.huge, -math.huge
     for k, v in ipairs(self.points) do
-        local z = self:func(v[1], v[2])
-        minz = math.min(minz, z)
-        maxz = math.max(maxz, z)
-        v[3] = z
-    end
-    local zdiff = maxz - minz
-
-    -- local zscale = 0.00001
-    local zmax = math.max(math.abs(minz), math.abs(maxz))
-    -- if zmax > 100 then
-        -- zscale = 100 / zmax
-    -- end
-
-    for k, v in ipairs(self.points) do
-        local c = math.abs(v[3])/zmax
-        -- v[3] = v[3] * zscale
+        local c = math.abs(v[3])/self.zmax
         local pt = self.pointstf[k]
         self.camera:transform(v, pt)
         love.graphics.setColor(lerp(c, colormin[1], colormax[1]), lerp(c, colormin[2], colormax[2]), lerp(c, colormin[3], colormax[3]))
@@ -160,32 +138,98 @@ function plot:render()
     local r = 130
     self.camera:lookAt(matrix{50+r*math.cos(theta), 50+r*math.sin(theta), 40}, matrix{50, 50, 0}, matrix{0, 0, 1})
 
-    self.funcparam = math.sin(self.t)*1.4+1.5
-
     love.graphics.setLineWidth(linew)
     love.graphics.setColor(0.6, 0.6, 0.6, 0.6)
     self:drawGrid(self.xlines, self.xlinestf)
     self:drawGrid(self.ylines, self.ylinestf)
     love.graphics.setLineWidth(pointw)
     self:drawGraph()
+end
 
-    self.paramtext:set("Param = " .. tostring(self.funcparam))
-    love.graphics.draw(self.paramtext, 5, 5)
+local minimizer = class("minimizer")
+function minimizer:initialize(points, params, stepsize, calc)
+    self.points = points
+    self.params = params
+    self.lasterror = 0
+    self.stepsize = stepsize
+    self.calc = calc
+    self.calc()
+    self.lasterror = self:calcError()
+end
+
+function minimizer:calcError()
+    local err = 0
+    for _, v in ipairs(self.points) do
+        err = err + v[3]^2
+    end
+    return err
+end
+
+function minimizer:step()
+    --Find error that is less than current
+    local found = false
+    local err
+    for k, v in ipairs(self.params) do
+        self.params[k] = v + self.stepsize
+        self.calc()
+        err = self:calcError()
+        if err < self.lasterror then
+            found = true
+            break
+        end
+        self.params[k] = v - self.stepsize
+        self.calc()
+        err = self:calcError()
+        if err < self.lasterror then
+            found = true
+            break
+        end
+        self.params[k] = v
+    end
+    if found then
+        self.lasterror = err
+    else
+        self.stepsize = self.stepsize * 0.5
+    end
 end
 
 hook.add("postload","main",function()
     local p = plot:new(0, 100, 50, 0, 100, 50)
+    local points = p.points
+    local params = {0.15, 0.15}
 
-    -- function p:func(x, y)
-        -- local param = self.funcparam
+    -- local function func(x, y)
+        -- local param = params[1]
         -- return ((x+y)^3 - x^3 - y^3 - x^2*y*param - x*y^2*param) * 0.00001
     -- end
 
-    function p:func(x, y)
-        local param = self.funcparam
-        return ((x+y)^3 - x^3 - y^3 - 3*x^(3-param)*y^param - 3*x^param*y^(3-param)) * 0.00001
+    -- local function func(x, y)
+        -- local param = params[1]
+        -- return ((x+y)^3 - x^3 - y^3 - 3*x^(3-param)*y^param - 3*x^param*y^(3-param)) * 0.00002
+    -- end
+
+    local function func(x, y)
+        local param1, param2 = params[1], params[2]
+        return ((x+y)^math.pi - x^math.pi - y^math.pi - param2*x^(math.pi-param1)*y^param1 - param2*x^param1*y^(math.pi-param1)) * 0.00002
+    end
+    local function calcPoints()
+        local minz, maxz = math.huge, -math.huge
+        for k, v in ipairs(points) do
+            local z = func(v[1], v[2])
+            minz = math.min(minz, z)
+            maxz = math.max(maxz, z)
+            v[3] = z
+        end
+        local zmax = math.max(math.abs(minz), math.abs(maxz))
+        p.zmax = zmax
     end
 
+    local minimi = minimizer:new(points, params, 0.01, calcPoints)
+    hook.add("render","rendering",function()
+        minimi:step()
+        p:render()
+        love.graphics.print("Param1 = " .. tostring(params[1]) .. "\nParam2 = " .. tostring(params[2]), 5, 5)
+    end)
 end)
 
 function love.run()
