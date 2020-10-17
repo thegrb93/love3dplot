@@ -155,7 +155,7 @@ function minimizer:initialize(points, params, stepsize, calc)
     self.calc = calc
     self.calc()
     self.lasterror = self:calcError()
-    self.paramindex = 1
+    self:calcPermutations()
 end
 function minimizer:calcError()
     local err = 0
@@ -164,45 +164,87 @@ function minimizer:calcError()
     end
     return err
 end
+-- function minimizer:calcPermutations()
+    -- local permutations = {}
+    -- local counter = {}
+    -- for i=1, #self.params do
+        -- counter[i] = 0
+    -- end
+    -- while true do
+        -- local stop = true
+        -- for i=1, #self.params do
+            -- counter[i] = counter[i] + 1
+            -- if counter[i] == 3 then
+                -- counter[i] = 0
+            -- else
+                -- local perm = {}
+                -- for j=1, #self.params do
+                    -- if counter[j] == 0 then perm[j] = -self.stepsize
+                    -- elseif counter[j] == 1 then perm[j] = 0
+                    -- else perm[j] = self.stepsize end
+                -- end
+                -- permutations[#permutations+1] = perm
+                -- stop = false
+                -- break
+            -- end
+        -- end
+        -- if stop then
+            -- break
+        -- end
+    -- end
+    -- self.stepperms = permutations
+-- end
+function minimizer:calcPermutations()
+    local permutations = {}
+    for i=1, #self.params do
+        local perm1 = {}
+        local perm2 = {}
+        for j=1, #self.params do
+            if i==j then
+                perm1[j] = -self.stepsize
+                perm2[j] = self.stepsize
+            else
+                perm1[j] = 0
+                perm2[j] = 0
+            end
+        end
+        permutations[#permutations+1] = perm1
+        permutations[#permutations+1] = perm2
+    end
+    self.stepperms = permutations
+end
 function minimizer:step()
     --Find error that is less than current
-    local found = false
-    local err
-    for _=1, 100 do
-        for _=1, #self.params do
-            local v = self.params[self.paramindex]
-            self.params[self.paramindex] = v + self.stepsize
+    -- for _=1, 30 do
+        local leasterr = self.lasterror
+        local leastperm
+        local original = {}
+        for i, v in ipairs(self.params) do original[i] = v end
+
+        for _, perm in ipairs(self.stepperms) do
+            for i=1, #self.params do self.params[i] = original[i] + perm[i] end
             self.calc()
-            err = self:calcError()
-            if err < self.lasterror then
-                found = true
-                break
+            local err = self:calcError()
+            if err < leasterr then
+                leasterr = err
+                leastperm = perm
             end
-            self.params[self.paramindex] = v - self.stepsize
-            self.calc()
-            err = self:calcError()
-            if err < self.lasterror then
-                found = true
-                break
-            end
-            self.params[self.paramindex] = v
-            self.paramindex = (self.paramindex % #self.params) + 1
         end
-        if found then
-            self.paramindex = (self.paramindex % #self.params) + 1
-            self.stepsize = self.stepsize * 1.2
-            self.lasterror = err
-            break
+        if leastperm then
+            for i=1, #self.params do self.params[i] = original[i] + leastperm[i] end
+            self.lasterror = leasterr
         else
+            for i=1, #self.params do self.params[i] = original[i] end
             self.stepsize = self.stepsize * 0.5
+            self:calcPermutations()
         end
-    end
+    -- end
 end
 
 hook.add("postload","main",function()
-    local p = plot:new(0, 100, 50, 0, 100, 50)
+    local p = plot:new(0, 100, 30, 0, 100, 30)
     local points = p.points
-    local params = {1, 1, 1, 1, 1, 1}
+    local params = {1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5}
 
     -- local function func(x, y)
         -- local param = params[1]
@@ -215,8 +257,12 @@ hook.add("postload","main",function()
     -- end
 
     local function func(x, y)
-        local param1, param2, param3, param4, param5, param6 = params[1], params[2], params[3], params[4], params[5], params[6]
-        return ((x+y)^math.pi - x^math.pi - y^math.pi - param2*x^(math.pi-param1)*y^param1 - param2*x^param1*y^(math.pi-param1) - param3*x^(math.pi-param4)*y^param4 - param3*x^param4*y^(math.pi-param4) - param5*x^(math.pi-param6)*y^param6 - param5*x^param6*y^(math.pi-param6)) * 0.2
+        local z = (x+y)^math.pi - x^math.pi - y^math.pi
+        for i=1, #params, 2 do
+            local params1, params2 = params[i], params[i+1]
+            z = z - params1*x^(math.pi-params2)*y^params2 - params1*x^params2*y^(math.pi-params2)
+        end
+        return z*0.2
     end
     local function calcPoints()
         local minz, maxz = math.huge, -math.huge
@@ -230,12 +276,12 @@ hook.add("postload","main",function()
         p.zmax = zmax
     end
 
-    local minimi = minimizer:new(points, params, 0.005, calcPoints)
+    local minimi = minimizer:new(points, params, 0.1, calcPoints)
     hook.add("render","rendering",function()
         minimi:step()
         p:render()
         love.graphics.setColor(1, 1, 1)
-        love.graphics.print("Param1 = " .. tostring(params[1]) .. "\nParam2 = " .. tostring(params[2]) .. "\nParam3 = " .. tostring(params[3]) .. "\nParam4 = " .. tostring(params[4]) .. "\nParam5 = " .. tostring(params[5]) .. "\nParam6 = " .. tostring(params[6]), 5, 5)
+        love.graphics.print("Param1 = " .. tostring(params[1]) .. "\nParam2 = " .. tostring(params[2]) .. "\nParam3 = " .. tostring(params[3]) .. "\nParam4 = " .. tostring(params[4]) .. "\nParam5 = " .. tostring(params[5]) .. "\nParam6 = " .. tostring(params[6]) .. "\nParam7 = " .. tostring(params[7]) .. "\nParam8 = " .. tostring(params[8]), 5, 5)
     end)
 end)
 
