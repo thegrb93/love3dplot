@@ -139,7 +139,7 @@ function plot:render()
     self.camera:lookAt(matrix{50+r*math.cos(theta), 50+r*math.sin(theta), 40}, matrix{50, 50, 0}, matrix{0, 0, 1})
 
     love.graphics.setLineWidth(linew)
-    love.graphics.setColor(0.6, 0.6, 0.6, 0.6)
+    love.graphics.setColor(0.6, 0.6, 0.6)
     self:drawGrid(self.xlines, self.xlinestf)
     self:drawGrid(self.ylines, self.ylinestf)
     love.graphics.setLineWidth(pointw)
@@ -155,8 +155,8 @@ function minimizer:initialize(points, params, stepsize, calc)
     self.calc = calc
     self.calc()
     self.lasterror = self:calcError()
+    self.paramindex = 1
 end
-
 function minimizer:calcError()
     local err = 0
     for _, v in ipairs(self.points) do
@@ -164,27 +164,28 @@ function minimizer:calcError()
     end
     return err
 end
-
 function minimizer:step()
     --Find error that is less than current
     local found = false
     local err
-    for k, v in ipairs(self.params) do
-        self.params[k] = v + self.stepsize
+    for i=1, #self.params do
+        local v = self.params[self.paramindex]
+        self.params[self.paramindex] = v + self.stepsize
         self.calc()
         err = self:calcError()
         if err < self.lasterror then
             found = true
             break
         end
-        self.params[k] = v - self.stepsize
+        self.params[self.paramindex] = v - self.stepsize
         self.calc()
         err = self:calcError()
         if err < self.lasterror then
             found = true
             break
         end
-        self.params[k] = v
+        self.params[self.paramindex] = v
+        self.paramindex = (self.paramindex % #self.params) + 1
     end
     if found then
         self.lasterror = err
@@ -196,7 +197,7 @@ end
 hook.add("postload","main",function()
     local p = plot:new(0, 100, 50, 0, 100, 50)
     local points = p.points
-    local params = {0.15, 0.15}
+    local params = {0.15, 0.15, 0.15, 0.15}
 
     -- local function func(x, y)
         -- local param = params[1]
@@ -209,8 +210,8 @@ hook.add("postload","main",function()
     -- end
 
     local function func(x, y)
-        local param1, param2 = params[1], params[2]
-        return ((x+y)^math.pi - x^math.pi - y^math.pi - param2*x^(math.pi-param1)*y^param1 - param2*x^param1*y^(math.pi-param1)) * 0.00002
+        local param1, param2, param3, param4 = params[1], params[2], params[3], params[4]
+        return ((x+y)^math.pi - x^math.pi - y^math.pi - param2*x^(math.pi-param1)*y^param1 - param2*x^param1*y^(math.pi-param1) - param4*x^(math.pi-param3)*y^param3 - param4*x^param3*y^(math.pi-param3)) * 0.00002
     end
     local function calcPoints()
         local minz, maxz = math.huge, -math.huge
@@ -228,7 +229,8 @@ hook.add("postload","main",function()
     hook.add("render","rendering",function()
         minimi:step()
         p:render()
-        love.graphics.print("Param1 = " .. tostring(params[1]) .. "\nParam2 = " .. tostring(params[2]), 5, 5)
+        love.graphics.setColor(1, 1, 1)
+        love.graphics.print("Param1 = " .. tostring(params[1]) .. "\nParam2 = " .. tostring(params[2]) .. "\nParam3 = " .. tostring(params[3]) .. "\nParam4 = " .. tostring(params[4]), 5, 5)
     end)
 end)
 
