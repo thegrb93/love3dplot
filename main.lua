@@ -153,22 +153,16 @@ function plot:render()
 end
 
 local minimizer = class("minimizer")
-function minimizer:initialize(points, params, stepsize, calc)
+function minimizer:initialize(points, params, stepsize, calc, calcError)
     self.points = points
     self.params = params
     self.lasterror = 0
     self.stepsize = stepsize
     self.calc = calc
+    self.calcError = calcError
     self.calc()
-    self.lasterror = self:calcError()
+    self.lasterror = self.calcError()
     self:calcPermutations()
-end
-function minimizer:calcError()
-    local err = 0
-    for _, v in ipairs(self.points) do
-        err = err + v[3]^2
-    end
-    return err
 end
 -- function minimizer:calcPermutations()
     -- local permutations = {}
@@ -220,8 +214,9 @@ function minimizer:calcPermutations()
     self.stepperms = permutations
 end
 function minimizer:step()
+    if self.stepsize < 1e-6 then return end
     --Find error that is less than current
-    for _=1, 5 do
+    -- for _=1, 5 do
         local leasterr = self.lasterror
         local leastperm
         local original = {}
@@ -230,7 +225,7 @@ function minimizer:step()
         for _, perm in ipairs(self.stepperms) do
             for i=1, #self.params do self.params[i] = original[i] + perm[i] end
             self.calc()
-            local err = self:calcError()
+            local err = self.calcError()
             if err < leasterr then
                 leasterr = err
                 leastperm = perm
@@ -244,7 +239,7 @@ function minimizer:step()
             self.stepsize = self.stepsize * 0.5
             self:calcPermutations()
         end
-    end
+    -- end
 end
 
 hook.add("postload","main",function()
@@ -275,8 +270,15 @@ hook.add("postload","main",function()
             v[3] = func(v[1], v[2])
         end
     end
+    local function calcError()
+        local err = 0
+        for _, v in ipairs(points) do
+            err = err + (v[3]/(v[1]*v[2]+1))^2
+        end
+        return err
+    end
 
-    local minimi = minimizer:new(points, params, 0.1, calcPoints)
+    local minimi = minimizer:new(points, params, 0.1, calcPoints, calcError)
     hook.add("render","rendering",function()
         minimi:step()
         p:render()
