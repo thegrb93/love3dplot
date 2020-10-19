@@ -214,7 +214,7 @@ function minimizer:calcPermutations()
     self.stepperms = permutations
 end
 function minimizer:step()
-    if self.stepsize < 1e-6 then return end
+    if self.stepsize < 1e-5 then return end
     --Find error that is less than current
     -- for _=1, 5 do
         local leasterr = self.lasterror
