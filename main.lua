@@ -107,6 +107,9 @@ function plot:initialize(minx, maxx, nx, miny, maxy, ny)
     self.ylines = ylines
     self.ylinestf = ylinestf
 
+    self.centerx = (minx + maxx)/2
+    self.centery = (miny + maxy)/2
+    self.distance = math.max((maxx - minx)/2, (maxy - miny)/2)*2
     self.camera = camera:new(90, scrw, scrh, 0.1, 10000)
     self.t = 0
     self.dt = 1/60
@@ -141,8 +144,7 @@ function plot:render()
     self.t = self.t + self.dt
     
     local theta = self.t*0.2
-    local r = 130
-    self.camera:lookAt(matrix{50+r*math.cos(theta), 50+r*math.sin(theta), 40}, matrix{50, 50, 0}, matrix{0, 0, 1})
+    self.camera:lookAt(matrix{self.centerx+self.distance*math.cos(theta), self.centery+self.distance*math.sin(theta), 0.4*self.distance}, matrix{self.centerx, self.centery, 0}, matrix{0, 0, 1})
 
     love.graphics.setLineWidth(linew)
     love.graphics.setColor(0.6, 0.6, 0.6)
@@ -153,14 +155,12 @@ function plot:render()
 end
 
 local minimizer = class("minimizer")
-function minimizer:initialize(points, params, stepsize, calc, calcError)
+function minimizer:initialize(points, params, stepsize, calcError)
     self.points = points
     self.params = params
     self.lasterror = 0
     self.stepsize = stepsize
-    self.calc = calc
     self.calcError = calcError
-    self.calc()
     self.lasterror = self.calcError()
     self:calcPermutations()
 end
@@ -214,9 +214,12 @@ function minimizer:calcPermutations()
     self.stepperms = permutations
 end
 function minimizer:step()
-    if self.stepsize < 1e-5 then return end
+    if self.stepsize < 1e-5 then
+        print("{"..table.concat(self.params, ", ").."}")
+        self.step = function() end
+    end
     --Find error that is less than current
-    -- for _=1, 5 do
+    -- for _=1, 100 do
         local leasterr = self.lasterror
         local leastperm
         local original = {}
@@ -224,7 +227,6 @@ function minimizer:step()
 
         for _, perm in ipairs(self.stepperms) do
             for i=1, #self.params do self.params[i] = original[i] + perm[i] end
-            self.calc()
             local err = self.calcError()
             if err < leasterr then
                 leasterr = err
@@ -243,9 +245,9 @@ function minimizer:step()
 end
 
 hook.add("postload","main",function()
-    local p = plot:new(0, 100, 50, 0, 100, 50)
+    local p = plot:new(0, 10, 25, 0, 10, 25)
     local points = p.points
-    local params = {1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5}
+    local params = {0.775, 2.3555908203126, 0.995947265625, 2.6363159179688, 1.8569091796876, 1.124853515625, 0.6029052734375, 2.0859863281248, 0.86389160156257, 0.66158447265625, 1.0948242187494, 1.0421508789065, 0.19931640625, 2.123583984375, 0.88024902343751, -1.4717407226563, 1.1796875000001, 1.2220947265627}
 
     -- local function func(x, y)
         -- local param = params[1]
@@ -256,34 +258,46 @@ hook.add("postload","main",function()
         -- local param = params[1]
         -- return ((x+y)^3 - x^3 - y^3 - 3*x^(3-param)*y^param - 3*x^param*y^(3-param)) * 0.00002
     -- end
-
+    
     local function func(x, y)
         local z = (x+y)^math.pi - x^math.pi - y^math.pi
-        for i=1, #params, 2 do
-            local params1, params2 = params[i], params[i+1]
-            z = z - params1*x^(math.pi-params2)*y^params2 - params1*x^params2*y^(math.pi-params2)
+        for i=1, #params, 3 do
+            local params1, params2, params3 = params[i], params[i+1], params[i+2]
+            z = z - params1*(x^params3*y^params2 + x^params2*y^params3)
         end
-        return z*0.2
+        return z
     end
-    local function calcPoints()
-        for k, v in ipairs(points) do
-            v[3] = func(v[1], v[2])
-        end
-    end
+
+    -- local function func(x, y)
+        -- local z = math.sqrt(x+y) - math.sqrt(x) - math.sqrt(y)
+        -- for i=1, #params, 3 do
+            -- local params1, params2, params3 = params[i], params[i+1], params[i+2]
+            -- z = z - params1*(x^params2*y^params3 + x^params3*y^params2)
+        -- end
+        -- return z
+    -- end
+
     local function calcError()
         local err = 0
         for _, v in ipairs(points) do
-            err = err + (v[3]/(v[1]*v[2]+1))^2
+            local z = func(v[1], v[2])
+            v[3] = z
+            err = err + (z/(v[1]*v[2]+1)^2)^2
         end
         return err
     end
 
-    local minimi = minimizer:new(points, params, 0.1, calcPoints, calcError)
+    local minimi = minimizer:new(points, params, 0.1, calcError)
     hook.add("render","rendering",function()
         minimi:step()
         p:render()
         love.graphics.setColor(1, 1, 1)
-        love.graphics.print("Param1 = " .. tostring(params[1]) .. "\nParam2 = " .. tostring(params[2]) .. "\nParam3 = " .. tostring(params[3]) .. "\nParam4 = " .. tostring(params[4]) .. "\nParam5 = " .. tostring(params[5]) .. "\nParam6 = " .. tostring(params[6]) .. "\nParam7 = " .. tostring(params[7]) .. "\nParam8 = " .. tostring(params[8]), 5, 5)
+        
+        local paramsStr = {}
+        for k, v in ipairs(params) do
+            paramsStr[k] = "Param"..k.." = " .. tostring(v).."\n"
+        end
+        love.graphics.print(paramsStr, 5, 5)
     end)
 end)
 
