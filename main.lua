@@ -142,7 +142,6 @@ function plot:drawGraph()
 end
 function plot:render()
     self.t = self.t + self.dt
-    
     local theta = self.t*0.2
     self.camera:lookAt(matrix{self.centerx+self.distance*math.cos(theta), self.centery+self.distance*math.sin(theta), 0.4*self.distance}, matrix{self.centerx, self.centery, 0}, matrix{0, 0, 1})
 
@@ -245,7 +244,7 @@ function minimizer:step()
 end
 
 hook.add("postload","main",function()
-    local p = plot:new(0, 10, 25, 0, 10, 25)
+    local p = plot:new(-10, 10, 50, -10, 10, 50)
     local points = p.points
     local params = {0.775, 2.3555908203126, 0.995947265625, 2.6363159179688, 1.8569091796876, 1.124853515625, 0.6029052734375, 2.0859863281248, 0.86389160156257, 0.66158447265625, 1.0948242187494, 1.0421508789065, 0.19931640625, 2.123583984375, 0.88024902343751, -1.4717407226563, 1.1796875000001, 1.2220947265627}
 
@@ -259,13 +258,18 @@ hook.add("postload","main",function()
         -- return ((x+y)^3 - x^3 - y^3 - 3*x^(3-param)*y^param - 3*x^param*y^(3-param)) * 0.00002
     -- end
     
+    -- local function func(x, y)
+        -- local z = (x+y)^math.pi - x^math.pi - y^math.pi
+        -- for i=1, #params, 3 do
+            -- local params1, params2, params3 = params[i], params[i+1], params[i+2]
+            -- z = z - params1*(x^params3*y^params2 + x^params2*y^params3)
+        -- end
+        -- return z
+    -- end
+    
     local function func(x, y)
-        local z = (x+y)^math.pi - x^math.pi - y^math.pi
-        for i=1, #params, 3 do
-            local params1, params2, params3 = params[i], params[i+1], params[i+2]
-            z = z - params1*(x^params3*y^params2 + x^params2*y^params3)
-        end
-        return z
+        local t = p.t*2
+        return (math.cos(t)*(x^2-y^2)+math.sin(t)*(x*y))*0.1
     end
 
     -- local function func(x, y)
@@ -277,27 +281,29 @@ hook.add("postload","main",function()
         -- return z
     -- end
 
+    local t = 0
     local function calcError()
-        local err = 0
+        -- local err = 0
         for _, v in ipairs(points) do
             local z = func(v[1], v[2])
             v[3] = z
-            err = err + (z/(v[1]*v[2]+1)^2)^2
+            -- err = err + (z/(v[1]*v[2]+1)^2)^2
         end
-        return err
+        -- return err
     end
 
     local minimi = minimizer:new(points, params, 0.1, calcError)
     hook.add("render","rendering",function()
-        minimi:step()
+        -- minimi:step()
+        calcError()
         p:render()
-        love.graphics.setColor(1, 1, 1)
-        
-        local paramsStr = {}
-        for k, v in ipairs(params) do
-            paramsStr[k] = "Param"..k.." = " .. tostring(v).."\n"
-        end
-        love.graphics.print(paramsStr, 5, 5)
+
+        -- love.graphics.setColor(1, 1, 1)
+        -- local paramsStr = {}
+        -- for k, v in ipairs(params) do
+            -- paramsStr[k] = "Param"..k.." = " .. tostring(v).."\n"
+        -- end
+        -- love.graphics.print(paramsStr, 5, 5)
     end)
 end)
 
